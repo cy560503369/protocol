@@ -10,6 +10,16 @@
 #include "protocol103.h"
 #include "uart.h"
 
+void show(unsigned char* data, int len)
+{
+    int i = 0;
+    for(i = 0; i < len; i++)
+    {
+        printf("%02x ", data[i]);
+    }
+    printf("\n");
+}
+
 /* 获得微秒时间 */
 unsigned long get_ms_time()
 {
@@ -111,7 +121,7 @@ int recv_frame(Slave_node* pslave_node, unsigned char* pframe_buf)
                 tcflush(fd, TCIFLUSH);
                 return -1;
             }
-            
+            pbuf += sizeof(Tprtcl103_unfixed_frame_head)-1;
             // 读帧头后续内容
             int len = ((Tprtcl103_unfixed_frame_head*)pframe_buf)->len1;
             ret = serial_receive_data(fd, pbuf, len);
@@ -259,7 +269,9 @@ int ptrcl103_req_level1_data(Slave_node* pslave_node)
 	{
 		i--;
 		pack_fixed_frame(ctrl,slave_id,(unsigned char*)&reql1_frame);
-
+        printf("level1_data: %d\n", i);
+        printf("send: ");
+        show((unsigned char*)&reql1_frame, sizeof(Tprtcl103_fixed_frame));
 		int ret = serial_send_data(fd, (unsigned char*)&reql1_frame, sizeof(Tprtcl103_fixed_frame));
 		if(ret < 0)
 		{
@@ -272,7 +284,10 @@ int ptrcl103_req_level1_data(Slave_node* pslave_node)
 			continue;
 		}
 
+        printf("recive: ");
+        show(resp_buf, 30);
 		ret = parse_resp_frame((unsigned char*)&reql1_frame,(unsigned char*)resp_buf,pslave_node);
+        printf("level ret: %d\n", ret);
 		if(ret == 0)
 		{
 			break;
@@ -305,7 +320,7 @@ int communicate_init(Slave_node* pslave_node)
     int i = 0;
     int fd = pslave_node->fd;
     
-    unsigned char ctl_flag = COMB_CTRL(1,0,0,C_RFB_NA_3);
+    unsigned char ctl_flag = COMB_CTRL(1, 0, 0, C_RCU_NA_3);
     Tprtcl103_fixed_frame reset_frame = {0};
     Tprtcl103_fixed_frame reset_resp_frame = {0};
     unsigned char slave_id = pslave_node->slave_id;
@@ -315,6 +330,9 @@ int communicate_init(Slave_node* pslave_node)
     for(i = 0; i < 3; i++)
     {
         pack_fixed_frame(ctl_flag, slave_id, (unsigned char*)&reset_frame);
+        printf("communite: %d\n", i);
+        printf("send: ");
+        show((unsigned char*)&reset_frame, sizeof(Tprtcl103_fixed_frame));
         int ret = serial_send_data(fd, (unsigned char*)&reset_frame, sizeof(Tprtcl103_fixed_frame));
         if(ret < 0)
         {
@@ -326,9 +344,10 @@ int communicate_init(Slave_node* pslave_node)
         {
             continue;
         }
-        
+        printf("receive: ");
+        show((unsigned char*)&reset_resp_frame, sizeof(Tprtcl103_fixed_frame));
         ret = parse_resp_frame((unsigned char*)&reset_frame, (unsigned char*)&reset_resp_frame, pslave_node);
-
+        printf("commucate ret: %d\n", ret);
         if(ret == 0) // 执行成功
         {
         	return 0;
@@ -365,7 +384,10 @@ int total_refer(Slave_node* pSla_node)
 	int i = 0;
 	for(i = 0; i < 3; i++)
     {
-        pack_fixed_frame(ctrl, pSla_node->slave_id, (unsigned char*)&ttl_ref_frame);
+        pack_variable_frame(ctrl, pSla_node->slave_id, total_refer_data, 7, (unsigned char*)&ttl_ref_frame);
+        printf("total_refer: %d\n", i);
+        printf("send: ");
+        show((unsigned char*)&ttl_ref_frame, 15);
         int ret = serial_send_data(pSla_node->fd, (unsigned char*)&ttl_ref_frame, 15);
         if(ret < 0)
         {
@@ -377,9 +399,10 @@ int total_refer(Slave_node* pSla_node)
         {
             continue;
         }
-        
+        printf("receive: ");
+        show((unsigned char*)&ttl_ref_resp_frame, 30);
         ret = parse_resp_frame((unsigned char*)&ttl_ref_frame, (unsigned char*)&ttl_ref_resp_frame, pSla_node);
-
+        printf("total_refer ret: %d\n", ret);
         if(ret == 0) // 执行成功
         {
         	return 0;
@@ -403,17 +426,17 @@ int total_refer(Slave_node* pSla_node)
     return -1;
 }
 
-
 int protocol103_main(void)
 {
+	printf("start\n");
 	int serial_fd = open("/dev/ttyS1", O_RDWR);
 	if(serial_fd < 0)
 	{
 		return -1;
 	}
 
-	int ret = 0;
-    ret = set_serial(serial_fd, 115200, 8, 1, 'n');
+    int ret = 0;
+    ret = set_serial(serial_fd, 9600, 8, 1, 'n');
     if(ret < 0)
     {
     	return -1;
@@ -423,16 +446,21 @@ int protocol103_main(void)
     slave_node.fd = serial_fd;
     slave_node.slave_id = 1;  // 先默认为0，后面跟据配置文件进行设置
 
+	printf("com\n");
     ret = communicate_init(&slave_node);
     if(ret < 0)
     {
+        close(serial_fd);
     	return -1;
     }
 
     ret = total_refer(&slave_node);
     if(ret < 0)
     {
+        close(serial_fd);
     	return -1;
     }
+
+    close(serial_fd);
     return 0;
 }

@@ -85,4 +85,6 @@ typedef struct
 	unsigned char ctrl;
 	unsigned char slave_addr;
 }Tprtcl103_unfixed_frame_head;
+
+int protocol103_main(void);
 #endif
