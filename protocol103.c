@@ -285,7 +285,7 @@ int ptrcl103_req_level1_data(Slave_node* pslave_node)
 		}
 
         printf("recive: ");
-        show(resp_buf, 30);
+        show(resp_buf, resp_buf[1] + 6);
 		ret = parse_resp_frame((unsigned char*)&reql1_frame,(unsigned char*)resp_buf,pslave_node);
         printf("level ret: %d\n", ret);
 		if(ret == 0)
@@ -461,7 +461,7 @@ int get_group_id(Slave_node* pSla_node, unsigned char group_num)
             continue;
         }
         printf("receive: ");
-        show((unsigned char*)&group_resp_frame, 30);
+        show((unsigned char*)&group_resp_frame, 6);
         ret = parse_resp_frame((unsigned char*)&group_frame, (unsigned char*)&group_resp_frame, pSla_node);
         printf("group ret: %d\n", ret);
         if(ret == 0) // 执行成功
