@@ -426,9 +426,69 @@ int total_refer(Slave_node* pSla_node)
     return -1;
 }
 
+/* 读组值 */
+int get_group_id(Slave_node* pSla_node, unsigned char group_num)
+{
+    /*总召唤报文*/
+	unsigned char group_data[11] = {0x15, 0x81, 0x2a, 0x00, 0xfe, 0xf1, 0x00, 0x01,0x00, 0x00, 0x01};
+	group_data[3] = pSla_node->slave_id;
+    group_data[8] = group_num;
+
+	int ret = 0;
+
+	pSla_node->fcb = (~(pSla_node->fcb)) & 0x1;
+	unsigned char ctrl = COMB_CTRL(1, pSla_node->fcb,1, C_DR_NA_3);
+
+	unsigned char group_frame[19]={0};	
+	unsigned char group_resp_frame[MAX_FRAME_LEN] = {0};
+
+	int i = 0;
+	for(i = 0; i < 3; i++)
+    {
+        pack_variable_frame(ctrl, pSla_node->slave_id, group_data, 11, (unsigned char*)&group_frame);
+        printf("group: %d\n", i);
+        printf("send: ");
+        show((unsigned char*)&group_frame, 19);
+        int ret = serial_send_data(pSla_node->fd, (unsigned char*)&group_frame, 19);
+        if(ret < 0)
+        {
+            continue;
+        }
+        
+        ret = recv_frame(pSla_node, (unsigned char*)&group_resp_frame);
+        if(ret < 0)
+        {
+            continue;
+        }
+        printf("receive: ");
+        show((unsigned char*)&group_resp_frame, 30);
+        ret = parse_resp_frame((unsigned char*)&group_frame, (unsigned char*)&group_resp_frame, pSla_node);
+        printf("group ret: %d\n", ret);
+        if(ret == 0) // 执行成功
+        {
+        	return 0;
+        }
+        else if(ret == 1) // 要求请求一级用户数据
+        {
+        	if(ptrcl103_req_level1_data(pSla_node) < 0)
+        	{
+        		continue;
+        	}
+        	else
+        	{
+        		return 0;
+        	}
+        }
+        else
+        {
+        	continue;
+        }
+    }
+    return -1;
+}
+
 int protocol103_main(void)
 {
-	printf("start\n");
 	int serial_fd = open("/dev/ttyS1", O_RDWR);
 	if(serial_fd < 0)
 	{
@@ -446,7 +506,6 @@ int protocol103_main(void)
     slave_node.fd = serial_fd;
     slave_node.slave_id = 1;  // 先默认为0，后面跟据配置文件进行设置
 
-	printf("com\n");
     ret = communicate_init(&slave_node);
     if(ret < 0)
     {
@@ -455,6 +514,13 @@ int protocol103_main(void)
     }
 
     ret = total_refer(&slave_node);
+    if(ret < 0)
+    {
+        close(serial_fd);
+    	return -1;
+    }
+
+    ret = get_group_id(&slave_node, 9);
     if(ret < 0)
     {
         close(serial_fd);
