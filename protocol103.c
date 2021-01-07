@@ -658,17 +658,39 @@ int parse_config(char* config_str, Config_info* out_config)
     }
 }
 
+void clear_data(void)
+{
+    data_post = 0; // 清空数据
+    memset(prot103_data, 0, sizeof(Protocol103_data)*1000);
+}
+
+/* 生成json数据 */
+int make_json_data(void)
+{
+    int i = 0;
+    for(i = 0; i < data_post; i++)
+    {
+        printf("[%d]: slave_addr: %02x, type: %d, ", i, prot103_data[i].slave_addr, prot103_data[i].type);
+        if(prot103_data[i].type == EVENT_DATA)
+        {
+            printf("fun: %02x, inf:%02x, value: %02x\n", prot103_data[i].data.event_data.Fun, 
+                prot103_data[i].data.event_data.Inf, prot103_data[i].data.event_data.value);
+        }
+        else
+        {
+            printf("group: %02x, entry:%02x, value: %f\n", prot103_data[i].data.group_data.group, 
+                prot103_data[i].data.group_data.entry, prot103_data[i].data.group_data.value);
+        }
+    }
+    printf("\n");
+}
+
 int protocol103_main(void)
 {
-    // Config_info config_info;
-    // char* test_data = "{\"command\": \"protocol_config_set\",\"message\": {\"protocol\": \"iec103\",\"work_mode\": \"poll\",\"port\": \"/dev/ttyS1\",\"classify\": [{\"device_addr\": [\"1\", \"2\"],\"state_table\": [[178,20,\"id_ps\"],[178,23,\"id_fss\"],[178,48,\"id_fo\"]],\"message_table\": [{\"group\": 9,\"setting\": [[2, \"id_angia\"],[14, \"id_anguc\"]]}]}]}}";
-
-    // parse_config(test_data, &config_info);
-
-    // show_config(&config_info);
-
-    /*获取配置文件*/
+    /* 挂接配置文件的共享内存 */
     Protocol_config_sm* pconfig_sm = get_shared_memory(PROTOCOL103_CONFIG_SM_KEY);
+    /* 挂接数据文件的共享内存 */
+    Protocol_data_sm* pdata_sm = get_shared_memory(PROTOCOL103_DATA_SM_KEY);
 
     Config_info config_info;   // 解析json后的配置文件
 
@@ -678,7 +700,7 @@ int protocol103_main(void)
 
     show_config(&config_info);
 
-    int serial_fd = open("/dev/ttyS1", O_RDWR);
+    int serial_fd = open(config_info.port, O_RDWR);
     if(serial_fd < 0)
     {
         return -1;
@@ -691,30 +713,44 @@ int protocol103_main(void)
     	return -1;
     }
 
-    Slave_node slave_node = {0};
-    slave_node.fd = serial_fd;
-    slave_node.slave_id = 1;  // 先默认为0，后面跟据配置文件进行设置
+    clear_data(); // 清空数据
 
-    ret = communicate_init(&slave_node);
-    if(ret < 0)
+    int i = 0, j = 0;
+    for(i = 0; i < config_info.device_num; i++)
     {
-        close(serial_fd);
-    	return -1;
+        Slave_node slave_node = {0};
+        slave_node.fd = serial_fd;
+        slave_node.slave_id = config_info.device_addr[i];
+
+        ret = communicate_init(&slave_node);
+        if(ret < 0)
+        {
+            close(serial_fd);
+            return -1;
+        }
+
+        ret = total_refer(&slave_node);
+        if(ret < 0)
+        {
+            close(serial_fd);
+            return -1;
+        }
+
+        for(j = 0; j < config_info.message_table_num; j++)
+        {
+            ret = get_group_id(&slave_node, config_info.message_table[j].group);
+            if(ret < 0)
+            {
+                close(serial_fd);
+                return -1;
+            }
+        }
     }
 
-    ret = total_refer(&slave_node);
-    if(ret < 0)
-    {
-        close(serial_fd);
-    	return -1;
-    }
-
-    ret = get_group_id(&slave_node, 9);
-    if(ret < 0)
-    {
-        close(serial_fd);
-    	return -1;
-    }
+    make_json_data();
+    pthread_rwlock_wrlock(&pdata_sm->rwlock);
+    
+    pthread_rwlock_unlock(&pdata_sm->rwlock);
 
     close(serial_fd);
     return 0;
