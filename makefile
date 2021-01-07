@@ -1,6 +1,6 @@
 VPATH += ./
 
-LDFLAGS += -lm
+LDFLAGS += -lm -pthread
 
 CC = $(CROSS_COMPILE)gcc
 

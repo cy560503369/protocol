@@ -59,6 +59,44 @@ typedef enum
 	M_EOT_NA_3	= 31,//传送结束
 }Tprtcl103_asdu_type;//asdu类型标识
 
+typedef enum
+{
+    ASDU01 = 0x01,
+    ASDU02 = 0x02,
+    ASDU03 = 0x03,
+    ASDU04 = 0x04,
+    ASDU05 = 0x05,
+    ASDU08 = 0x08,
+    ASDU09 = 0x09,
+    ASDU10 = 0x0a,
+    ASDU11 = 0x0b,
+    ASDU23 = 0x17,
+    ASDU26 = 0x1a,
+    ASDU27 = 0x1b,
+    ASDU28 = 0x1c,
+    ASDU29 = 0x1d,
+    ASDU30 = 0x1e,
+    ASDU31 = 0x1f,
+    ASDU32 = 0x20,
+    ASDU33 = 0x21,
+    ASDU34 = 0x22,
+    ASDU35 = 0x23,
+    ASDU36 = 0x24,
+    ASDU37 = 0x25,
+    ASDU38 = 0x26,
+    ASDU39 = 0x27,
+    ASDU40 = 0x28,
+    ASDU41 = 0x29,
+    ASDU42 = 0x2a,
+    ASDU43 = 0x2b,
+    ASDU44 = 0x2c,
+    ASDU45 = 0x2d,
+    ASDU46 = 0x2e,
+    ASDU47 = 0x2f,
+    ASDU48 = 0x30,
+    ASDU50 = 0x32,
+}ASDU_TYPE;
+
 typedef struct
 {
     int fd;
@@ -85,6 +123,70 @@ typedef struct
 	unsigned char ctrl;
 	unsigned char slave_addr;
 }Tprtcl103_unfixed_frame_head;
+
+/*************************************/
+typedef struct
+{
+	unsigned char Fun;
+	unsigned char Inf;
+	unsigned char value;   // 0:分，1:合
+}Event_data;
+
+typedef struct
+{
+	unsigned char group;
+	unsigned char entry;
+	float value;   // 
+}Group_data;
+
+typedef enum
+{
+	EVENT_DATA,
+	GROUP_DATA,
+}Data_type;
+/* 103协议数据存储结构 */
+typedef struct
+{
+	unsigned char slave_addr;    // 从机地址
+	Data_type type;
+	union
+	{
+		Event_data event_data;
+		Group_data group_data;
+	}data;
+}Protocol103_data;
+
+/*配置格式*/
+typedef struct 
+{
+	unsigned char Fun;
+	unsigned char Inf;
+	char id_name[30];	
+}State_table;
+
+typedef struct
+{
+	unsigned char entry;
+	char id_name[30];
+}Entry_info;
+
+typedef struct 
+{
+	unsigned char group;  //组号
+	int entry_num;
+	Entry_info entry_info[20]; //每个组最多读取20个数据
+}Message_table;
+
+typedef struct
+{
+	unsigned char port[30];  // 串口路径
+	int device_num;   // 设备个数
+	unsigned char device_addr[5];  // 最多支持5台从机
+	int state_table_num; // 事件个数
+	State_table state_table[30];
+	int message_table_num; // 读取几个组的数据
+	Message_table message_table[5];
+}Config_info;
 
 int protocol103_main(void);
 #endif

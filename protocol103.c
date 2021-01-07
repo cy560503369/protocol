@@ -7,8 +7,13 @@
 #include <string.h>
 #include <termios.h>
 
+#include "protocol.h"
 #include "protocol103.h"
 #include "uart.h"
+
+/* 103数据缓存区，先弄成固定长度的，后面要求高的话，可以改成链表 */
+Protocol103_data prot103_data[1000] = {0};
+int data_post = 0;   // 当前数据偏移
 
 void show(unsigned char* data, int len)
 {
@@ -20,6 +25,38 @@ void show(unsigned char* data, int len)
     printf("\n");
 }
 
+void show_config(Config_info* con)
+{
+    int i, j;
+    printf("conifg:\n");
+    printf("%s\n", con->port);
+    printf("device num;%d\n", con->device_num);
+    printf("device: ");
+    for(i=0; i<con->device_num; i++)
+    {
+        printf("%d ", con->device_addr[i]);
+    }
+    printf("\n");
+    printf("state num;%d\n", con->state_table_num);
+    for(i = 0; i < con->state_table_num; i++)
+    {
+        printf("stat[%d]: %d, %d, %s\n", i, con->state_table[i].Fun, 
+            con->state_table[i].Inf, con->state_table[i].id_name);
+    }
+    printf("\n");
+    printf("mess num;%d\n", con->message_table_num);
+    for(i = 0; i < con->message_table_num; i++)
+    {
+        printf("mess[%d]: group: %d, entrynum:%d, ", i, con->message_table[i].group,
+            con->message_table[i].entry_num);
+        for(j = 0; j < con->message_table[i].entry_num; j++)
+        {
+            printf("set[%d]: %d, %s  ", j, con->message_table[i].entry_info[j].entry,
+                con->message_table[i].entry_info[j].id_name);
+        }
+        printf("\n");
+    }
+}
 /* 获得微秒时间 */
 unsigned long get_ms_time()
 {
@@ -157,6 +194,54 @@ int recv_frame(Slave_node* pslave_node, unsigned char* pframe_buf)
     }
 }
 
+int unpack_ASDU_frame(char* buff, unsigned char slave_addr)
+{
+	unsigned char asdu_type = buff[0];
+	switch(asdu_type)
+	{
+		case ASDU01:
+		case ASDU02:
+		{
+			prot103_data[data_post].slave_addr = slave_addr;
+			prot103_data[data_post].type = EVENT_DATA;
+			prot103_data[data_post].data.event_data.Fun = buff[4];
+			prot103_data[data_post].data.event_data.Inf = buff[5];
+			if((buff[6] & 0x03) == 0x02)
+			{
+				prot103_data[data_post].data.event_data.value = 1; //'on'
+			}
+			else
+			{
+				prot103_data[data_post].data.event_data.value = 0;  //'off'
+			}
+			data_post++; // 更新数据位置
+		}
+			break;
+		case ASDU10:
+		{
+			unsigned char data_num = buff[7] & 0x3f;
+			unsigned char data_size = 0;
+			unsigned char num = 0;
+			int i = 0, off_set = 0;
+			for(i = 0; i < data_num; i++)
+			{
+				prot103_data[data_post].slave_addr = slave_addr;
+				prot103_data[data_post].type = GROUP_DATA;
+				prot103_data[data_post].data.group_data.group = buff[8 + off_set];
+				prot103_data[data_post].data.group_data.entry = buff[9 + off_set];
+				
+				memcpy(&prot103_data[data_post].data.group_data.value, &buff[14 + off_set], 4);
+
+				off_set += 10;
+				data_post++;
+			}
+		}
+			break;
+		default:
+			break;
+	}
+}
+
 /* 
     判断应答帧resp_frame是否为命令帧cmd_frame的正确应答
     返回值：-1，不是正确应答；0，是正确应答且acd为0；1，是正确应答且acd为1
@@ -241,7 +326,7 @@ int parse_resp_frame(unsigned char* cmd_frame, unsigned char* resp_frame, Slave_
 		case M_LKR_NA_3:
 			return resp_frame_acd;
 		case M_DR_NA_3:
-			// unpack_ASDU_frame((char*)(resp_frame+6),pslave_node->slave_id);
+			unpack_ASDU_frame((char*)(resp_frame+6),pslave_node->slave_id);
 			return resp_frame_acd;	
 		default:
 			break;
@@ -487,13 +572,117 @@ int get_group_id(Slave_node* pSla_node, unsigned char group_num)
     return -1;
 }
 
+/* 解析配置文件 */
+int parse_config(char* config_str, Config_info* out_config)
+{
+    int i = 0, j = 0;
+    cJSON *json_root = cJSON_Parse(config_str);
+    if(json_root == NULL)
+    {
+        return -1;
+    }
+
+    cJSON *json_item = cJSON_GetObjectItem(json_root, "message");
+    if(json_item == NULL)
+    {
+        return -1;
+    }
+
+    cJSON* json_table = cJSON_GetObjectItem(json_item, "protocol");
+    if(0 != strcmp(json_table->valuestring, "iec103"))
+    {
+        return -1;
+    }
+
+    json_table = cJSON_GetObjectItem(json_item, "port"); // 获取串口port
+    strcpy(out_config->port, json_table->valuestring);
+
+    json_table = cJSON_GetObjectItem(json_item, "classify"); 
+    cJSON* json_subarray = cJSON_GetArrayItem(json_table, 0);
+
+    cJSON* json_array = cJSON_GetObjectItem(json_subarray,"device_addr");
+    int device_num = cJSON_GetArraySize(json_array);
+    out_config->device_num = device_num;
+
+    cJSON *json_data, *json_data1, *json_data2, *json_data3;
+    
+    for(i = 0; i < device_num; i++)
+    {
+        json_data = cJSON_GetArrayItem(json_array, i);
+        out_config->device_addr[i] = (unsigned char)(json_data->valuestring[0] - '0');
+    }
+
+    json_array = cJSON_GetObjectItem(json_subarray,"state_table");
+    int table_num = cJSON_GetArraySize(json_array);
+    out_config->state_table_num = table_num;
+
+    for(i = 0; i < table_num; i++)
+    {
+        json_data = cJSON_GetArrayItem(json_array, i);
+
+        json_data1 = cJSON_GetArrayItem(json_data, 0);
+        out_config->state_table[i].Fun = json_data1->valueint;
+
+        json_data1 = cJSON_GetArrayItem(json_data, 1);
+        out_config->state_table[i].Inf = json_data1->valueint;
+
+        json_data1 = cJSON_GetArrayItem(json_data, 2);
+        strcpy(out_config->state_table[i].id_name, json_data1->valuestring);
+    }
+
+    json_array = cJSON_GetObjectItem(json_subarray,"message_table");
+    int message_num = cJSON_GetArraySize(json_array);
+    out_config->message_table_num = message_num;
+
+    for(i = 0; i < message_num; i++)
+    {
+        json_data = cJSON_GetArrayItem(json_array, i);
+
+        json_data1 = cJSON_GetObjectItem(json_data, "group");
+        out_config->message_table[i].group = json_data1->valueint;
+
+        json_data1 = cJSON_GetObjectItem(json_data, "setting");
+        int set_num = cJSON_GetArraySize(json_data1);
+        out_config->message_table[i].entry_num = set_num;
+
+        for(j = 0; j < set_num; j++)
+        {
+            json_data2 = cJSON_GetArrayItem(json_data1, j);
+
+            json_data3 = cJSON_GetArrayItem(json_data2, 0);
+            out_config->message_table[i].entry_info[j].entry = json_data3->valueint;
+
+            json_data3 = cJSON_GetArrayItem(json_data2, 1);
+            strcpy(out_config->message_table[i].entry_info[j].id_name, json_data3->valuestring);
+        }
+    }
+}
+
 int protocol103_main(void)
 {
-	int serial_fd = open("/dev/ttyS1", O_RDWR);
-	if(serial_fd < 0)
-	{
-		return -1;
-	}
+    // Config_info config_info;
+    // char* test_data = "{\"command\": \"protocol_config_set\",\"message\": {\"protocol\": \"iec103\",\"work_mode\": \"poll\",\"port\": \"/dev/ttyS1\",\"classify\": [{\"device_addr\": [\"1\", \"2\"],\"state_table\": [[178,20,\"id_ps\"],[178,23,\"id_fss\"],[178,48,\"id_fo\"]],\"message_table\": [{\"group\": 9,\"setting\": [[2, \"id_angia\"],[14, \"id_anguc\"]]}]}]}}";
+
+    // parse_config(test_data, &config_info);
+
+    // show_config(&config_info);
+
+    /*获取配置文件*/
+    Protocol_config_sm* pconfig_sm = get_shared_memory(PROTOCOL103_CONFIG_SM_KEY);
+
+    Config_info config_info;   // 解析json后的配置文件
+
+    pthread_rwlock_wrlock(&pconfig_sm->rwlock);
+    parse_config(pconfig_sm->config_data, &config_info);
+    pthread_rwlock_unlock(&pconfig_sm->rwlock);
+
+    show_config(&config_info);
+
+    int serial_fd = open("/dev/ttyS1", O_RDWR);
+    if(serial_fd < 0)
+    {
+        return -1;
+    }
 
     int ret = 0;
     ret = set_serial(serial_fd, 9600, 8, 1, 'n');
