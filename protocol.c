@@ -1,8 +1,8 @@
 
 #include <time.h>
+#include <unistd.h>
 #include "protocol103.h"
 #include "protocol.h"
-
 
 /* 挂接共享，共享内存需要在整个系统初始化时进行创建，
 	该处只是对共享进行使用 */
@@ -22,5 +22,10 @@ void* get_shared_memory(key_t key)
 
 int main(void)
 {
-	protocol103_main();
+	while(1)
+	{
+		protocol103_main();
+
+		sleep(10);
+	}
 }

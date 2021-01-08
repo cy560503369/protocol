@@ -15,48 +15,6 @@
 Protocol103_data prot103_data[1000] = {0};
 int data_post = 0;   // 当前数据偏移
 
-void show(unsigned char* data, int len)
-{
-    int i = 0;
-    for(i = 0; i < len; i++)
-    {
-        printf("%02x ", data[i]);
-    }
-    printf("\n");
-}
-
-void show_config(Config_info* con)
-{
-    int i, j;
-    printf("conifg:\n");
-    printf("%s\n", con->port);
-    printf("device num;%d\n", con->device_num);
-    printf("device: ");
-    for(i=0; i<con->device_num; i++)
-    {
-        printf("%d ", con->device_addr[i]);
-    }
-    printf("\n");
-    printf("state num;%d\n", con->state_table_num);
-    for(i = 0; i < con->state_table_num; i++)
-    {
-        printf("stat[%d]: %d, %d, %s\n", i, con->state_table[i].Fun, 
-            con->state_table[i].Inf, con->state_table[i].id_name);
-    }
-    printf("\n");
-    printf("mess num;%d\n", con->message_table_num);
-    for(i = 0; i < con->message_table_num; i++)
-    {
-        printf("mess[%d]: group: %d, entrynum:%d, ", i, con->message_table[i].group,
-            con->message_table[i].entry_num);
-        for(j = 0; j < con->message_table[i].entry_num; j++)
-        {
-            printf("set[%d]: %d, %s  ", j, con->message_table[i].entry_info[j].entry,
-                con->message_table[i].entry_info[j].id_name);
-        }
-        printf("\n");
-    }
-}
 /* 获得微秒时间 */
 unsigned long get_ms_time()
 {
@@ -354,9 +312,6 @@ int ptrcl103_req_level1_data(Slave_node* pslave_node)
 	{
 		i--;
 		pack_fixed_frame(ctrl,slave_id,(unsigned char*)&reql1_frame);
-        printf("level1_data: %d\n", i);
-        printf("send: ");
-        show((unsigned char*)&reql1_frame, sizeof(Tprtcl103_fixed_frame));
 		int ret = serial_send_data(fd, (unsigned char*)&reql1_frame, sizeof(Tprtcl103_fixed_frame));
 		if(ret < 0)
 		{
@@ -369,10 +324,7 @@ int ptrcl103_req_level1_data(Slave_node* pslave_node)
 			continue;
 		}
 
-        printf("recive: ");
-        show(resp_buf, resp_buf[1] + 6);
 		ret = parse_resp_frame((unsigned char*)&reql1_frame,(unsigned char*)resp_buf,pslave_node);
-        printf("level ret: %d\n", ret);
 		if(ret == 0)
 		{
 			break;
@@ -415,9 +367,6 @@ int communicate_init(Slave_node* pslave_node)
     for(i = 0; i < 3; i++)
     {
         pack_fixed_frame(ctl_flag, slave_id, (unsigned char*)&reset_frame);
-        printf("communite: %d\n", i);
-        printf("send: ");
-        show((unsigned char*)&reset_frame, sizeof(Tprtcl103_fixed_frame));
         int ret = serial_send_data(fd, (unsigned char*)&reset_frame, sizeof(Tprtcl103_fixed_frame));
         if(ret < 0)
         {
@@ -429,10 +378,8 @@ int communicate_init(Slave_node* pslave_node)
         {
             continue;
         }
-        printf("receive: ");
-        show((unsigned char*)&reset_resp_frame, sizeof(Tprtcl103_fixed_frame));
+
         ret = parse_resp_frame((unsigned char*)&reset_frame, (unsigned char*)&reset_resp_frame, pslave_node);
-        printf("commucate ret: %d\n", ret);
         if(ret == 0) // 执行成功
         {
         	return 0;
@@ -470,9 +417,6 @@ int total_refer(Slave_node* pSla_node)
 	for(i = 0; i < 3; i++)
     {
         pack_variable_frame(ctrl, pSla_node->slave_id, total_refer_data, 7, (unsigned char*)&ttl_ref_frame);
-        printf("total_refer: %d\n", i);
-        printf("send: ");
-        show((unsigned char*)&ttl_ref_frame, 15);
         int ret = serial_send_data(pSla_node->fd, (unsigned char*)&ttl_ref_frame, 15);
         if(ret < 0)
         {
@@ -484,10 +428,8 @@ int total_refer(Slave_node* pSla_node)
         {
             continue;
         }
-        printf("receive: ");
-        show((unsigned char*)&ttl_ref_resp_frame, 30);
+
         ret = parse_resp_frame((unsigned char*)&ttl_ref_frame, (unsigned char*)&ttl_ref_resp_frame, pSla_node);
-        printf("total_refer ret: %d\n", ret);
         if(ret == 0) // 执行成功
         {
         	return 0;
@@ -531,9 +473,7 @@ int get_group_id(Slave_node* pSla_node, unsigned char group_num)
 	for(i = 0; i < 3; i++)
     {
         pack_variable_frame(ctrl, pSla_node->slave_id, group_data, 11, (unsigned char*)&group_frame);
-        printf("group: %d\n", i);
-        printf("send: ");
-        show((unsigned char*)&group_frame, 19);
+
         int ret = serial_send_data(pSla_node->fd, (unsigned char*)&group_frame, 19);
         if(ret < 0)
         {
@@ -545,10 +485,8 @@ int get_group_id(Slave_node* pSla_node, unsigned char group_num)
         {
             continue;
         }
-        printf("receive: ");
-        show((unsigned char*)&group_resp_frame, 6);
+
         ret = parse_resp_frame((unsigned char*)&group_frame, (unsigned char*)&group_resp_frame, pSla_node);
-        printf("group ret: %d\n", ret);
         if(ret == 0) // 执行成功
         {
         	return 0;
@@ -656,6 +594,8 @@ int parse_config(char* config_str, Config_info* out_config)
             strcpy(out_config->message_table[i].entry_info[j].id_name, json_data3->valuestring);
         }
     }
+
+    cJSON_Delete(json_root);
 }
 
 void clear_data(void)
@@ -664,25 +604,107 @@ void clear_data(void)
     memset(prot103_data, 0, sizeof(Protocol103_data)*1000);
 }
 
-/* 生成json数据 */
-int make_json_data(void)
+/* 生成json格式数据，并写入共享内存 */
+int make_json_data(Config_info* conf, Protocol_data_sm* data_sm)
 {
-    int i = 0;
-    for(i = 0; i < data_post; i++)
-    {
-        printf("[%d]: slave_addr: %02x, type: %d, ", i, prot103_data[i].slave_addr, prot103_data[i].type);
-        if(prot103_data[i].type == EVENT_DATA)
+    time_t t;
+    t = time(NULL);
+    int now_time = time(&t);
+
+    int i = 0, j = 0, k = 0, l = 0;
+
+    // 现在只支持一台设备，打开注释，可以支持多台设备
+    // cJSON* cjson_root = cJSON_CreateObject();
+
+    // for(k = 0; k < conf->device_num; k++)
+    // {
+        cJSON* cjson_array = cJSON_CreateArray();
+        cJSON* cjson_item = NULL;
+
+        for(i = 0; i < conf->state_table_num; i++)
         {
-            printf("fun: %02x, inf:%02x, value: %02x\n", prot103_data[i].data.event_data.Fun, 
-                prot103_data[i].data.event_data.Inf, prot103_data[i].data.event_data.value);
+            cjson_item = cJSON_CreateObject();
+            cJSON_AddStringToObject(cjson_item, "id", conf->state_table[i].id_name);
+
+            for(j = 0; j < data_post; j++)
+            {
+                if((conf->device_addr[k] == prot103_data[j].slave_addr) && 
+                    (prot103_data[j].type == EVENT_DATA))
+                {
+                    if((conf->state_table[i].Fun == prot103_data[j].data.event_data.Fun) &&
+                        (conf->state_table[i].Inf == prot103_data[j].data.event_data.Inf))
+                    {
+                        cJSON_AddNumberToObject(cjson_item, "value", prot103_data[j].data.event_data.value);
+                        break;
+                    }
+                }
+                else
+                {
+                    continue;
+                }
+            }
+
+            if(j >= data_post)
+            {
+                cJSON_AddNumberToObject(cjson_item, "value", 0);
+            }
+
+            cJSON_AddNumberToObject(cjson_item, "time", now_time);
+
+            cJSON_AddItemToArray(cjson_array, cjson_item);
         }
-        else
+
+        for(i = 0; i < conf->message_table_num; i++)
         {
-            printf("group: %02x, entry:%02x, value: %f\n", prot103_data[i].data.group_data.group, 
-                prot103_data[i].data.group_data.entry, prot103_data[i].data.group_data.value);
+            for(l = 0; l < conf->message_table[i].entry_num; l++)
+            {
+                cjson_item = cJSON_CreateObject();
+                cJSON_AddStringToObject(cjson_item, "id", conf->message_table[i].entry_info[l].id_name);
+
+                for(j = 0; j < data_post; j++)
+                {
+                    if((conf->device_addr[k] == prot103_data[j].slave_addr) && 
+                        (prot103_data[j].type == GROUP_DATA))
+                    {
+                        if((conf->message_table[i].group == prot103_data[j].data.group_data.group) &&
+                            (conf->message_table[i].entry_info[l].entry == prot103_data[j].data.group_data.entry))
+                        {
+                            cJSON_AddNumberToObject(cjson_item, "value", prot103_data[j].data.group_data.value);
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        continue;
+                    }
+                }
+
+                if(j >= data_post)
+                {
+                    cJSON_AddNumberToObject(cjson_item, "value", 0);
+                }
+                cJSON_AddNumberToObject(cjson_item, "time", now_time);
+                cJSON_AddItemToArray(cjson_array, cjson_item);
+            }
         }
-    }
-    printf("\n");
+
+    //     char slave[5] = {0};
+    //     sprintf(slave, "%d", conf->device_addr[k]);
+    //     cJSON_AddItemToObject(cjson_root, slave, cjson_array);
+    // }
+
+    /* 打印JSON对象(整条链表)的所有数据 */
+    // char* str = cJSON_Print(cjson_root);  // 支持多台设备时使用这句
+
+    char* str = cJSON_Print(cjson_array);  // 支持多台设备时注释掉这句
+
+    pthread_rwlock_wrlock(&data_sm->rwlock);
+    memset(data_sm->protocol_data, 0, PROTOCOL103_DATA_LEN);  // 清空数据区
+    strcpy(data_sm->protocol_data, str);    // 将结果写入数据区
+    pthread_rwlock_unlock(&data_sm->rwlock);
+
+    // cJSON_Delete(cjson_root);  // 支持多台设备时使用这句
+    cJSON_Delete(cjson_array);  // 支持多台设备时注释掉这句
 }
 
 int protocol103_main(void)
@@ -692,13 +714,17 @@ int protocol103_main(void)
     /* 挂接数据文件的共享内存 */
     Protocol_data_sm* pdata_sm = get_shared_memory(PROTOCOL103_DATA_SM_KEY);
 
-    Config_info config_info;   // 解析json后的配置文件
+    Config_info config_info = {0};   // 解析json后的配置文件
 
+    /* 配置文件需要每次都解析，这样配置文件更新时可以及时根据新的配置文件来获取数据 */
     pthread_rwlock_wrlock(&pconfig_sm->rwlock);
+    if(pconfig_sm->started != 1)   // 判断启动标志位，如果不是为启动，直接退出
+    {
+        pthread_rwlock_unlock(&pconfig_sm->rwlock);
+        return -1;
+    }
     parse_config(pconfig_sm->config_data, &config_info);
     pthread_rwlock_unlock(&pconfig_sm->rwlock);
-
-    show_config(&config_info);
 
     int serial_fd = open(config_info.port, O_RDWR);
     if(serial_fd < 0)
@@ -713,8 +739,9 @@ int protocol103_main(void)
     	return -1;
     }
 
-    clear_data(); // 清空数据
+    clear_data(); // 清空数据缓冲区
 
+    /* 获取数据 */
     int i = 0, j = 0;
     for(i = 0; i < config_info.device_num; i++)
     {
@@ -747,11 +774,10 @@ int protocol103_main(void)
         }
     }
 
-    make_json_data();
-    pthread_rwlock_wrlock(&pdata_sm->rwlock);
-    
-    pthread_rwlock_unlock(&pdata_sm->rwlock);
+    /* 生成josn结果，并写入共享内存 */
+    make_json_data(&config_info, pdata_sm);
 
     close(serial_fd);
+
     return 0;
 }
