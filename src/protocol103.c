@@ -707,7 +707,7 @@ int make_json_data(Config_info* conf, Protocol_data_sm* data_sm)
     return 0;
 }
 
-int protocol103_main(void)
+void protocol103_main(void)
 {
     /* 挂接配置文件的共享内存 */
     Protocol_config_sm* pconfig_sm = get_shared_memory(PROTOCOL103_CONFIG_SM_KEY);
@@ -716,68 +716,71 @@ int protocol103_main(void)
 
     Config_info config_info = {0};   // 解析json后的配置文件
 
-    /* 配置文件需要每次都解析，这样配置文件更新时可以及时根据新的配置文件来获取数据 */
-    pthread_rwlock_wrlock(&pconfig_sm->rwlock);
-    if(pconfig_sm->started != 1)   // 判断启动标志位，如果不是为启动，直接退出
+    while(1)
     {
+        /* 配置文件需要每次都解析，这样配置文件更新时可以及时根据新的配置文件来获取数据 */
+        pthread_rwlock_wrlock(&pconfig_sm->rwlock);
+        if(pconfig_sm->started != 1)   // 判断启动标志位，如果不是为启动，直接退出
+        {
+            pthread_rwlock_unlock(&pconfig_sm->rwlock);
+            sleep(10);
+            continue;
+        }
+        parse_config(pconfig_sm->config_data, &config_info);
         pthread_rwlock_unlock(&pconfig_sm->rwlock);
-        return -1;
-    }
-    parse_config(pconfig_sm->config_data, &config_info);
-    pthread_rwlock_unlock(&pconfig_sm->rwlock);
 
-    int serial_fd = open(config_info.port, O_RDWR);
-    if(serial_fd < 0)
-    {
-        return -1;
-    }
-
-    int ret = 0;
-    ret = set_serial(serial_fd, 9600, 8, 1, 'n');
-    if(ret < 0)
-    {
-    	return -1;
-    }
-
-    clear_data(); // 清空数据缓冲区
-
-    /* 获取数据 */
-    int i = 0, j = 0;
-    for(i = 0; i < config_info.device_num; i++)
-    {
-        Slave_node slave_node = {0};
-        slave_node.fd = serial_fd;
-        slave_node.slave_id = config_info.device_addr[i];
-
-        ret = communicate_init(&slave_node);
-        if(ret < 0)
+        int serial_fd = open(config_info.port, O_RDWR);
+        if(serial_fd < 0)
         {
-            close(serial_fd);
-            return -1;
+            sleep(1);
+            continue;
         }
 
-        ret = total_refer(&slave_node);
+        int ret = 0;
+        ret = set_serial(serial_fd, 9600, 8, 1, 'n');
         if(ret < 0)
         {
-            close(serial_fd);
-            return -1;
+            sleep(1);
+            continue;
         }
 
-        for(j = 0; j < config_info.message_table_num; j++)
+        clear_data(); // 清空数据缓冲区
+
+        /* 获取数据 */
+        int i = 0, j = 0;
+        for(i = 0; i < config_info.device_num; i++)
         {
-            ret = get_group_id(&slave_node, config_info.message_table[j].group);
+            Slave_node slave_node = {0};
+            slave_node.fd = serial_fd;
+            slave_node.slave_id = config_info.device_addr[i];
+
+            ret = communicate_init(&slave_node);
             if(ret < 0)
             {
-                close(serial_fd);
-                return -1;
+                continue;
+            }
+
+            ret = total_refer(&slave_node);
+            if(ret < 0)
+            {
+                continue;
+            }
+
+            for(j = 0; j < config_info.message_table_num; j++)
+            {
+                ret = get_group_id(&slave_node, config_info.message_table[j].group);
+                if(ret < 0)
+                {
+                    break;
+                }
             }
         }
+
+        /* 生成josn结果，并写入共享内存 */
+        make_json_data(&config_info, pdata_sm);
+
+        close(serial_fd);
+
+        sleep(60);
     }
-
-    /* 生成josn结果，并写入共享内存 */
-    make_json_data(&config_info, pdata_sm);
-
-    close(serial_fd);
-
-    return 0;
 }

@@ -6,9 +6,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+Procotol104_data p104_data[1000] = {0};
+unsigned int data_post = 0;
+
 /* Callback handler to log sent or received messages (optional) */
-static void
-rawMessageHandler (void* parameter, uint8_t* msg, int msgSize, bool sent)
+static void rawMessageHandler (void* parameter, uint8_t* msg, int msgSize, bool sent)
 {
     if (sent)
         printf("SEND: ");
@@ -24,8 +26,7 @@ rawMessageHandler (void* parameter, uint8_t* msg, int msgSize, bool sent)
 }
 
 /* Connection event handler */
-static void
-connectionHandler (void* parameter, CS104_Connection connection, CS104_ConnectionEvent event)
+static void connectionHandler (void* parameter, CS104_Connection connection, CS104_ConnectionEvent event)
 {
     switch (event) {
     case CS104_CONNECTION_OPENED:
@@ -48,8 +49,7 @@ connectionHandler (void* parameter, CS104_Connection connection, CS104_Connectio
  *
  * For CS104 the address parameter has to be ignored
  */
-static bool
-asduReceivedHandler (void* parameter, int address, CS101_ASDU asdu)
+static bool asduReceivedHandler (void* parameter, int address, CS101_ASDU asdu)
 {
     printf("RECVD ASDU type: %s(%i) elements: %i\n",
             TypeID_toString(CS101_ASDU_getTypeID(asdu)),
@@ -100,16 +100,10 @@ asduReceivedHandler (void* parameter, int address, CS101_ASDU asdu)
     return true;
 }
 
-int protocol104_main(int argc, char** argv)
+int protocol104_main(void)
 {
-    const char* ip = "localhost";
+    const char* ip = "192.168.31.1";
     uint16_t port = IEC_60870_5_104_DEFAULT_PORT;
-
-    if (argc > 1)
-        ip = argv[1];
-
-    if (argc > 2)
-        port = atoi(argv[2]);
 
     printf("Connecting to: %s:%i\n", ip, port);
     CS104_Connection con = CS104_Connection_create(ip, port);

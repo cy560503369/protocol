@@ -20,10 +20,13 @@ void* get_shared_memory(key_t key)
 
 int main(void)
 {
-	while(1)
-	{
-		protocol103_main();
+	pthread_t  tid_protocol03 = 0;
+	pthread_t  tid_protocol04 = 0;
 
-		sleep(10);
-	}
+	// 创建103线程
+	pthread_create(&tid_protocol03, NULL, protocol103_main, NULL);
+
+	// 创建104处理线程
+	pthread_create(&tid_protocol03, NULL, protocol104_main, NULL);
+}
 }
