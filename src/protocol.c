@@ -24,9 +24,13 @@ int main(void)
 	pthread_t  tid_protocol04 = 0;
 
 	// 创建103线程
-	pthread_create(&tid_protocol03, NULL, protocol103_main, NULL);
+	pthread_create(&tid_protocol03, NULL, (void*)protocol103_main, NULL);
 
 	// 创建104处理线程
-	pthread_create(&tid_protocol03, NULL, protocol104_main, NULL);
-}
+	pthread_create(&tid_protocol04, NULL, (void*)protocol104_main, NULL);
+
+	while(1)
+	{
+		sleep(20);
+	}
 }

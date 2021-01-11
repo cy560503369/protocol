@@ -179,7 +179,7 @@ typedef struct
 
 typedef struct
 {
-	unsigned char port[30];  // 串口路径
+	char port[30];  // 串口路径
 	int device_num;   // 设备个数
 	unsigned char device_addr[5];  // 最多支持5台从机
 	int state_table_num; // 事件个数

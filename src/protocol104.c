@@ -2,12 +2,13 @@
 #include "hal_time.h"
 #include "hal_thread.h"
 #include "protocol.h"
+#include "protocol104.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 
 Procotol104_data p104_data[1000] = {0};
-unsigned int data_post = 0;
+unsigned int p104_data_post = 0;
 
 /* Callback handler to log sent or received messages (optional) */
 static void rawMessageHandler (void* parameter, uint8_t* msg, int msgSize, bool sent)
@@ -93,6 +94,43 @@ static bool asduReceivedHandler (void* parameter, int address, CS101_ASDU asdu)
             SinglePointInformation_destroy(io);
         }
     }
+    else if (CS101_ASDU_getTypeID(asdu) == M_ME_ND_1) {
+        printf("  measured point information:\n");
+
+        int i;
+
+        for (i = 0; i < CS101_ASDU_getNumberOfElements(asdu); i++) {
+
+            MeasuredValueNormalizedWithoutQuality io = 
+                    (MeasuredValueNormalizedWithoutQuality) CS101_ASDU_getElement(asdu, i);
+
+            printf("    IOA: %i value: %lf\n",
+                    InformationObject_getObjectAddress((InformationObject) io),
+                    MeasuredValueNormalizedWithoutQuality_getValue((MeasuredValueNormalizedWithoutQuality) io)
+            );
+
+            MeasuredValueNormalizedWithoutQuality_destroy(io);
+        }
+    }
+    else if (CS101_ASDU_getTypeID(asdu) == M_IT_NA_1) {
+        printf("  measured point information:\n");
+
+        int i;
+
+        for (i = 0; i < CS101_ASDU_getNumberOfElements(asdu); i++) {
+
+            IntegratedTotals io = (IntegratedTotals) CS101_ASDU_getElement(asdu, i);
+
+            BinaryCounterReading covf = IntegratedTotals_getBCR((IntegratedTotals) io);
+
+            printf("    IOA: %i, Value: %i\n",
+                    InformationObject_getObjectAddress((InformationObject) io),
+                    BinaryCounterReading_getValue(covf)
+            );
+
+            IntegratedTotals_destroy(io);
+        }
+    }
     else if (CS101_ASDU_getTypeID(asdu) == C_TS_TA_1) {
         printf("  test command with timestamp\n");
     }
@@ -100,9 +138,9 @@ static bool asduReceivedHandler (void* parameter, int address, CS101_ASDU asdu)
     return true;
 }
 
-int protocol104_main(void)
+void protocol104_main(void)
 {
-    const char* ip = "192.168.31.1";
+    const char* ip = "192.168.31.224";
     uint16_t port = IEC_60870_5_104_DEFAULT_PORT;
 
     printf("Connecting to: %s:%i\n", ip, port);
@@ -128,10 +166,12 @@ int protocol104_main(void)
 
         Thread_sleep(5000);
 
-        struct sCP56Time2a testTimestamp;
-        CP56Time2a_createFromMsTimestamp(&testTimestamp, Hal_getTimeInMs());
+        CS104_Connection_sendCounterInterrogationCommand(con, CS101_COT_ACTIVATION, 0, 0);
+        Thread_sleep(5000);
+        // struct sCP56Time2a testTimestamp;
+        // CP56Time2a_createFromMsTimestamp(&testTimestamp, Hal_getTimeInMs());
 
-        CS104_Connection_sendTestCommandWithTimestamp(con, 1, 0x4938, &testTimestamp);
+        // CS104_Connection_sendTestCommandWithTimestamp(con, 1, 0x4938, &testTimestamp);
 
 #if 0
         InformationObject sc = (InformationObject)

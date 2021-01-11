@@ -205,10 +205,9 @@ int unpack_ASDU_frame(char* buff, unsigned char slave_addr)
  */
 int parse_resp_frame(unsigned char* cmd_frame, unsigned char* resp_frame, Slave_node* pslave_node)
 {
-    int cmd_frame_type, resp_frame_type;
-    int cmd_frame_ctrl, resp_frame_ctrl;
-    int cmd_frame_fcb, resp_frame_acd;
-    int cmd_frame_fun, resp_frame_fun;
+    int resp_frame_ctrl;
+    int resp_frame_acd;
+    int resp_frame_fun;
     unsigned char cmd_slave_addr,resp_slave_addr;
      
     Tprtcl103_fixed_frame* pfixed_cmd_frame = NULL;
@@ -225,25 +224,18 @@ int parse_resp_frame(unsigned char* cmd_frame, unsigned char* resp_frame, Slave_
     
     if(*cmd_frame == FIXED_FRAME_START_CHAR)
     {
-        cmd_frame_type = FIXED_FRAME_TYPE;
         pfixed_cmd_frame = (Tprtcl103_fixed_frame*)cmd_frame;
-        cmd_frame_ctrl = pfixed_cmd_frame->ctrl;
         cmd_slave_addr = pfixed_cmd_frame->slave_addr;
     }
     else
     {
-        cmd_frame_type = UNFIXED_FRAME_TYPE;
+
         punfixed_cmd_frame = (Tprtcl103_unfixed_frame_head*)cmd_frame;
-        cmd_frame_ctrl = punfixed_cmd_frame->ctrl;
         cmd_slave_addr = punfixed_cmd_frame->slave_addr;
     }
     
-    cmd_frame_fcb = FETCH_FCB(cmd_frame_ctrl);
-    cmd_frame_fun = FETCH_FUN(cmd_frame_ctrl);
-    
     if(*resp_frame == FIXED_FRAME_START_CHAR)
     {
-        resp_frame_type = FIXED_FRAME_TYPE;
         pfixed_resp_frame = (Tprtcl103_fixed_frame*)resp_frame;
         /* 校验crc */
         if(cal_cs(&pfixed_resp_frame->ctrl, 2) != pfixed_resp_frame->crc)
@@ -255,7 +247,6 @@ int parse_resp_frame(unsigned char* cmd_frame, unsigned char* resp_frame, Slave_
     }
     else
     {
-        resp_frame_type = UNFIXED_FRAME_TYPE;
         punfixed_resp_frame = (Tprtcl103_unfixed_frame_head*)resp_frame;
         /* 校验crc */
         if(cal_cs(&punfixed_resp_frame->ctrl, punfixed_resp_frame->len1) != 

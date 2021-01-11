@@ -42,7 +42,7 @@ typedef struct
 }Protocol_data_sm;
 
 void* get_shared_memory(key_t key);
-int protocol103_main(void);
-int protocol104_main(void);
+void protocol103_main(void);
+void protocol104_main(void);
 
 #endif
