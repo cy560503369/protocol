@@ -178,8 +178,6 @@ int unpack_ASDU_frame(char* buff, unsigned char slave_addr)
 		case ASDU10:
 		{
 			unsigned char data_num = buff[7] & 0x3f;
-			unsigned char data_size = 0;
-			unsigned char num = 0;
 			int i = 0, off_set = 0;
 			for(i = 0; i < data_num; i++)
 			{
@@ -198,6 +196,7 @@ int unpack_ASDU_frame(char* buff, unsigned char slave_addr)
 		default:
 			break;
 	}
+	return 0;
 }
 
 /* 
@@ -353,7 +352,6 @@ int ptrcl103_req_level1_data(Slave_node* pslave_node)
 /* 通信初始化 */
 int communicate_init(Slave_node* pslave_node)
 {
-    int reset_flag = -1;
     int i = 0;
     int fd = pslave_node->fd;
     
@@ -417,7 +415,7 @@ int total_refer(Slave_node* pSla_node)
 	for(i = 0; i < 3; i++)
     {
         pack_variable_frame(ctrl, pSla_node->slave_id, total_refer_data, 7, (unsigned char*)&ttl_ref_frame);
-        int ret = serial_send_data(pSla_node->fd, (unsigned char*)&ttl_ref_frame, 15);
+        ret = serial_send_data(pSla_node->fd, (unsigned char*)&ttl_ref_frame, 15);
         if(ret < 0)
         {
             continue;
@@ -474,7 +472,7 @@ int get_group_id(Slave_node* pSla_node, unsigned char group_num)
     {
         pack_variable_frame(ctrl, pSla_node->slave_id, group_data, 11, (unsigned char*)&group_frame);
 
-        int ret = serial_send_data(pSla_node->fd, (unsigned char*)&group_frame, 19);
+        ret = serial_send_data(pSla_node->fd, (unsigned char*)&group_frame, 19);
         if(ret < 0)
         {
             continue;
@@ -596,6 +594,7 @@ int parse_config(char* config_str, Config_info* out_config)
     }
 
     cJSON_Delete(json_root);
+    return 0;
 }
 
 void clear_data(void)
@@ -705,6 +704,7 @@ int make_json_data(Config_info* conf, Protocol_data_sm* data_sm)
 
     // cJSON_Delete(cjson_root);  // 支持多台设备时使用这句
     cJSON_Delete(cjson_array);  // 支持多台设备时注释掉这句
+    return 0;
 }
 
 int protocol103_main(void)

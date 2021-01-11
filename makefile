@@ -1,21 +1,26 @@
-VPATH += ./
+BIN = ./bin
+SRC = ./src
+INC = ./include/
+LIB = -L./lib -l60870 -lpthread
+OBJ = ./obj
+SOURCE = $(wildcard ${SRC}/*.c)
+OBJECT = $(patsubst %.c,${OBJ}/%.o,$(notdir ${SOURCE}))
 
-LDFLAGS += -lm -pthread
+TARGET = protocol
+BIN_TARGET = ${BIN}/${TARGET}
 
 CC = $(CROSS_COMPILE)gcc
+CFLAGS =  -Wall -I${INC}
 
-BIN_PATH := ../bin
+${BIN_TARGET}:${OBJECT}
+	$(CC)  -o $@ ${OBJECT}  ${LIB}
 
-target = protocol
+${OBJ}/%.o:${SRC}/%.c
+	$(CC) -c $<  -o  $@ $(CFLAGS)  ${LIB} 
 
-all: $(target)
-
-obj-protocol = cJSON.o uart.o protocol103.o protocol.o
-
-protocol: $(obj-protocol)
-	$(CC) $(LDFLAGS) $(obj-protocol) -o $(BIN_PATH)/protocol
 
 .PHONY:clean
 clean:
-	rm *.o
-	rm $(BIN_PATH)/protocol
+	find $(OBJ) -name *.o -exec rm -rf {} \;
+	rm $(BIN_TARGET) -f
+	

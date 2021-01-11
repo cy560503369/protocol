@@ -188,5 +188,4 @@ typedef struct
 	Message_table message_table[5];
 }Config_info;
 
-int protocol103_main(void);
 #endif

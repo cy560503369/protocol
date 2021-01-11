@@ -42,4 +42,5 @@ typedef struct
 }Protocol_data_sm;
 
 void* get_shared_memory(key_t key);
+int protocol103_main(void);
 #endif

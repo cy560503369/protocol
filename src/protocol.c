@@ -1,7 +1,5 @@
-
 #include <time.h>
 #include <unistd.h>
-#include "protocol103.h"
 #include "protocol.h"
 
 /* 挂接共享，共享内存需要在整个系统初始化时进行创建，
