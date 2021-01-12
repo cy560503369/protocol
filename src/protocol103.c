@@ -603,6 +603,10 @@ int make_json_data(Config_info* conf, Protocol_data_sm* data_sm)
 
     int i = 0, j = 0, k = 0, l = 0;
 
+    if(data_post == 0)
+    {
+        return -1;
+    }
     // 现在只支持一台设备，打开注释，可以支持多台设备
     // cJSON* cjson_root = cJSON_CreateObject();
 
@@ -772,6 +776,6 @@ void protocol103_main(void)
 
         close(serial_fd);
 
-        sleep(60);
+        sleep(10);
     }
 }

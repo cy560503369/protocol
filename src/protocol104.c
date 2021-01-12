@@ -193,6 +193,11 @@ int make_104_data(Procotol104_config* conf, Protocol_data_sm* data_sm)
 
     int i = 0, j = 0;
 
+    if(p104_data_post == 0)
+    {
+        return 0;
+    }
+
     cJSON* cjson_array = cJSON_CreateArray();
     cJSON* cjson_item = NULL;
 
@@ -223,6 +228,7 @@ int make_104_data(Procotol104_config* conf, Protocol_data_sm* data_sm)
         }
 
         cJSON_AddNumberToObject(cjson_item, "time", now_time);
+        cJSON_AddItemToArray(cjson_array, cjson_item);
     }
 
     char* str = cJSON_Print(cjson_array);
@@ -245,49 +251,54 @@ void protocol104_main(void)
 
     Procotol104_config p104_conf = {0};
 
-    // 处理配置文件
-    pthread_rwlock_wrlock(&p104_config_sm->rwlock);
-    if(p104_config_sm->started != 1)   // 判断启动标志位，如果不是为启动，直接退出
+    while(1)
     {
+        // 处理配置文件
+        pthread_rwlock_wrlock(&p104_config_sm->rwlock);
+        if(p104_config_sm->started != 1)   // 判断启动标志位，如果不是为启动，直接退出
+        {
+            pthread_rwlock_unlock(&p104_config_sm->rwlock);
+            sleep(10);
+            return;
+        }
+        parse104_config(p104_config_sm->config_data, &p104_conf);
         pthread_rwlock_unlock(&p104_config_sm->rwlock);
+
+        init_104_data();  // 清空数据缓冲区
+
+        CS104_Connection con = CS104_Connection_create(p104_conf.ip, p104_conf.port);
+
+        CS101_AppLayerParameters alParams = CS104_Connection_getAppLayerParameters(con);
+        alParams->originatorAddress = 3;
+
+        CS104_Connection_setConnectionHandler(con, connectionHandler, NULL);
+        CS104_Connection_setASDUReceivedHandler(con, asduReceivedHandler, NULL);
+
+        if (CS104_Connection_connect(con)) {
+
+            CS104_Connection_sendStartDT(con);
+
+            Thread_sleep(1000);
+
+            CS104_Connection_sendInterrogationCommand(con, CS101_COT_ACTIVATION, 1, IEC60870_QOI_STATION);
+
+            Thread_sleep(1000);
+
+            CS104_Connection_sendCounterInterrogationCommand(con, CS101_COT_ACTIVATION, 0, 0);
+            Thread_sleep(1000);
+
+            CS104_Connection_sendStopDT(con);
+            Thread_sleep(2000);
+        }
+
+        Thread_sleep(1000);
+
+        CS104_Connection_destroy(con);
+
+        make_104_data(&p104_conf, p104_data_sm);
+
         sleep(10);
-        return;
     }
-    parse104_config(p104_config_sm->config_data, &p104_conf);
-    pthread_rwlock_unlock(&p104_config_sm->rwlock);
-
-    init_104_data();  // 清空数据缓冲区
-
-    CS104_Connection con = CS104_Connection_create(p104_conf.ip, p104_conf.port);
-
-    CS101_AppLayerParameters alParams = CS104_Connection_getAppLayerParameters(con);
-    alParams->originatorAddress = 3;
-
-    CS104_Connection_setConnectionHandler(con, connectionHandler, NULL);
-    CS104_Connection_setASDUReceivedHandler(con, asduReceivedHandler, NULL);
-
-    if (CS104_Connection_connect(con)) {
-        printf("Connected!\n");
-
-        CS104_Connection_sendStartDT(con);
-
-        Thread_sleep(2000);
-
-        CS104_Connection_sendInterrogationCommand(con, CS101_COT_ACTIVATION, 1, IEC60870_QOI_STATION);
-
-        Thread_sleep(2000);
-
-        CS104_Connection_sendCounterInterrogationCommand(con, CS101_COT_ACTIVATION, 0, 0);
-        Thread_sleep(2000);
-    }
-    else
-        printf("Connect failed!\n");
-
-    Thread_sleep(1000);
-
-    CS104_Connection_destroy(con);
-
-    make_104_data(&p104_conf, p104_data_sm);
 }
 
 

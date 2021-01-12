@@ -38,7 +38,7 @@ void* build_shared_memory(key_t key, size_t size)
 int main(void)
 {
 	char* test_data = "{\"command\": \"protocol_config_set\",\"message\": {\"protocol\": \"iec103\",\"work_mode\": \"poll\",\"port\": \"/dev/ttyS1\",\"classify\": [{\"device_addr\": [\"1\", \"2\"],\"state_table\": [[178,20,\"id_ps\"],[178,23,\"id_fss\"],[178,48,\"id_fo\"]],\"message_table\": [{\"group\": 9,\"setting\": [[2, \"id_angia\"],[14, \"id_anguc\"]]}]}]}}";
-	char* a104_test = "{\"command\": \"protocol_config_set\",\"message\": {\"protocol\": \"iec104\",\"ip\": \"192.168.2.3\",\"port\": 2404,\"classify\": [{\"device_addr\": [\"1\"],\"catch_table\": [[1,\"id_test1\"],[3,\"id_test2\"],[1025,\"id_fo\"]]}]}}";
+	char* a104_test = "{\"command\": \"protocol_config_set\",\"message\": {\"protocol\": \"iec104\",\"ip\": \"192.168.31.224\",\"port\": 2404,\"classify\": [{\"device_addr\": [\"1\"],\"catch_table\": [[1,\"id_test1\"],[3,\"id_test2\"],[1025,\"id_fo\"]]}]}}";
 	pthread_rwlockattr_t attr;
 
 	Protocol_config_sm* p_conf = build_shared_memory(PROTOCOL103_CONFIG_SM_KEY, PROTOCOL103_CONFIG_LEN);
