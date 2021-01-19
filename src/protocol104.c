@@ -117,6 +117,17 @@ static bool asduReceivedHandler (void* parameter, int address, CS101_ASDU asdu)
     return true;
 }
 
+int str_to_int(char *str)
+{
+	int i = 0;
+	int data = 0;
+	for(i = 0; i < strlen(str); i++)
+	{
+		data = data * 10;
+		data += str[i];
+	}
+	return data;
+}
 int parse104_config(char* config_str, Procotol104_config* out_config)
 {
     int i;
@@ -126,23 +137,17 @@ int parse104_config(char* config_str, Procotol104_config* out_config)
         return -1;
     }
 
-    cJSON *json_item = cJSON_GetObjectItem(json_root, "message");
-    if(json_item == NULL)
-    {
-        return -1;
-    }
-
-    cJSON* json_table = cJSON_GetObjectItem(json_item, "protocol");
+    cJSON* json_table = cJSON_GetObjectItem(json_root, "protocol");
     if(0 != strcmp(json_table->valuestring, "iec104"))
     {
         return -1;
     }
 
-    json_table = cJSON_GetObjectItem(json_item, "ip"); // 获取ip
+    json_table = cJSON_GetObjectItem(json_item, "work_mode"); // 获取ip
     strcpy(out_config->ip, json_table->valuestring);
 
-    json_table = cJSON_GetObjectItem(json_item, "port"); // 获取ip
-    out_config->port = json_table->valueint;
+    json_table = cJSON_GetObjectItem(json_item, "port"); // 获取port
+    out_config->port = str_to_int(json_table->valuestring);
 
     json_table = cJSON_GetObjectItem(json_item, "classify"); 
     cJSON* json_subarray = cJSON_GetArrayItem(json_table, 0);
@@ -159,7 +164,7 @@ int parse104_config(char* config_str, Procotol104_config* out_config)
         out_config->device_addr[i] = (unsigned char)(json_data->valuestring[0] - '0');
     }
 
-    json_array = cJSON_GetObjectItem(json_subarray,"catch_table");
+    json_array = cJSON_GetObjectItem(json_subarray,"state_table");
     array_num = cJSON_GetArraySize(json_array);
     out_config->catch_num = array_num;
 
