@@ -124,7 +124,7 @@ int str_to_int(char *str)
 	for(i = 0; i < strlen(str); i++)
 	{
 		data = data * 10;
-		data += str[i];
+		data += (str[i] - '0');
 	}
 	return data;
 }
@@ -143,13 +143,14 @@ int parse104_config(char* config_str, Procotol104_config* out_config)
         return -1;
     }
 
-    json_table = cJSON_GetObjectItem(json_item, "work_mode"); // 获取ip
+    json_table = cJSON_GetObjectItem(json_root, "work_mode"); // 获取ip
     strcpy(out_config->ip, json_table->valuestring);
 
-    json_table = cJSON_GetObjectItem(json_item, "port"); // 获取port
+    json_table = cJSON_GetObjectItem(json_root, "port"); // 获取port
     out_config->port = str_to_int(json_table->valuestring);
+    printf("%s", json_table->valuestring);
 
-    json_table = cJSON_GetObjectItem(json_item, "classify"); 
+    json_table = cJSON_GetObjectItem(json_root, "classify"); 
     cJSON* json_subarray = cJSON_GetArrayItem(json_table, 0);
 
     cJSON* json_array = cJSON_GetObjectItem(json_subarray,"device_addr");
@@ -164,21 +165,46 @@ int parse104_config(char* config_str, Procotol104_config* out_config)
         out_config->device_addr[i] = (unsigned char)(json_data->valuestring[0] - '0');
     }
 
+    int post = 0;
     json_array = cJSON_GetObjectItem(json_subarray,"state_table");
     array_num = cJSON_GetArraySize(json_array);
-    out_config->catch_num = array_num;
 
     cJSON *catch_data, *arr_data;
     for(i = 0; i < array_num; i++)
     {
         catch_data = cJSON_GetArrayItem(json_array, i);
-        arr_data = cJSON_GetArrayItem(catch_data, 0);
-        out_config->catch_list[i].point_addr = arr_data->valueint;
-
         arr_data = cJSON_GetArrayItem(catch_data, 1);
-        strcpy(out_config->catch_list[i].point_name, arr_data->valuestring);
-    }
+        out_config->catch_list[post].point_addr = arr_data->valueint;
 
+        arr_data = cJSON_GetArrayItem(catch_data, 2);
+        strcpy(out_config->catch_list[post].point_name, arr_data->valuestring);
+        post++;
+    }
+    
+    json_array = cJSON_GetObjectItem(json_subarray,"message_table");
+    array_num = cJSON_GetArraySize(json_array);
+
+    cJSON *message_data, *setting_data, *data1, *data2;
+    for(i = 0; i < array_num; i++)
+    {
+        message_data = cJSON_GetArrayItem(json_array, i);
+
+        setting_data = cJSON_GetObjectItem(message_data, "setting");
+        int set_num = cJSON_GetArraySize(setting_data);
+        int j = 0;
+        for(j = 0; j < set_num; j++)
+        {
+            data1 = cJSON_GetArrayItem(setting_data, j);
+
+            data2 = cJSON_GetArrayItem(data1, 0);
+            out_config->catch_list[post].point_addr = data2->valueint;
+
+            data2 = cJSON_GetArrayItem(data1, 1);
+            strcpy(out_config->catch_list[post].point_name, data2->valuestring);
+            post++;
+        }
+    }
+    out_config->catch_num = post;
     cJSON_Delete(json_root);
     return 0;
 }
