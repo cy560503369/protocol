@@ -137,20 +137,25 @@ int parse104_config(char* config_str, Procotol104_config* out_config)
         return -1;
     }
 
-    cJSON* json_table = cJSON_GetObjectItem(json_root, "protocol");
+	cJSON *json_item = cJSON_GetObjectItem(json_root, "message");
+	if(json_item == NULL)
+	{
+		return -1;
+	}
+
+    cJSON* json_table = cJSON_GetObjectItem(json_item, "protocol");
     if(0 != strcmp(json_table->valuestring, "iec104"))
     {
         return -1;
     }
 
-    json_table = cJSON_GetObjectItem(json_root, "work_mode"); // 获取ip
+    json_table = cJSON_GetObjectItem(json_item, "work_mode"); // 获取ip
     strcpy(out_config->ip, json_table->valuestring);
 
-    json_table = cJSON_GetObjectItem(json_root, "port"); // 获取port
+    json_table = cJSON_GetObjectItem(json_item, "port"); // 获取port
     out_config->port = str_to_int(json_table->valuestring);
-    printf("%s", json_table->valuestring);
 
-    json_table = cJSON_GetObjectItem(json_root, "classify"); 
+    json_table = cJSON_GetObjectItem(json_item, "classify"); 
     cJSON* json_subarray = cJSON_GetArrayItem(json_table, 0);
 
     cJSON* json_array = cJSON_GetObjectItem(json_subarray,"device_addr");
@@ -282,6 +287,7 @@ void protocol104_main(void)
 
     Procotol104_config p104_conf = {0};
 
+    int ret = 0;
     while(1)
     {
         // 处理配置文件
@@ -290,9 +296,15 @@ void protocol104_main(void)
         {
             pthread_rwlock_unlock(&p104_config_sm->rwlock);
             sleep(10);
-            return;
+            continue;
         }
-        parse104_config(p104_config_sm->config_data, &p104_conf);
+        ret = parse104_config(p104_config_sm->config_data, &p104_conf);
+		if(ret == -1)
+		{
+        	pthread_rwlock_unlock(&p104_config_sm->rwlock);
+			sleep(10);
+            continue;
+		}
         pthread_rwlock_unlock(&p104_config_sm->rwlock);
 
         init_104_data();  // 清空数据缓冲区
