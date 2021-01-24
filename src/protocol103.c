@@ -713,6 +713,8 @@ void protocol103_main(void)
 
     while(1)
     {
+        int ret = 0;
+
         /* 配置文件需要每次都解析，这样配置文件更新时可以及时根据新的配置文件来获取数据 */
         pthread_rwlock_wrlock(&pconfig_sm->rwlock);
         if(pconfig_sm->started != 1)   // 判断启动标志位，如果不是为启动，直接退出
@@ -721,7 +723,13 @@ void protocol103_main(void)
             sleep(10);
             continue;
         }
-        parse_config(pconfig_sm->config_data, &config_info);
+        ret = parse_config(pconfig_sm->config_data, &config_info);
+        if(ret == -1)
+        {
+            pthread_rwlock_unlock(&pconfig_sm->rwlock);
+            sleep(10);
+            continue;
+        }
         pthread_rwlock_unlock(&pconfig_sm->rwlock);
 
         int serial_fd = open(config_info.port, O_RDWR);
@@ -731,7 +739,6 @@ void protocol103_main(void)
             continue;
         }
 
-        int ret = 0;
         ret = set_serial(serial_fd, 9600, 8, 1, 'n');
         if(ret < 0)
         {

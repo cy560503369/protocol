@@ -22,12 +22,16 @@ int main(void)
 {
 	pthread_t  tid_protocol03 = 0;
 	pthread_t  tid_protocol04 = 0;
+	pthread_t  tid_protocol02 = 0;
 
 	// 创建103线程
 	pthread_create(&tid_protocol03, NULL, (void*)protocol103_main, NULL);
 
 	// 创建104处理线程
 	pthread_create(&tid_protocol04, NULL, (void*)protocol104_main, NULL);
+
+	// 创建104处理线程
+	pthread_create(&tid_protocol02, NULL, (void*)protocol102_main, NULL);
 
 	while(1)
 	{

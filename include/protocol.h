@@ -44,5 +44,6 @@ typedef struct
 void* get_shared_memory(key_t key);
 void protocol103_main(void);
 void protocol104_main(void);
+void protocol102_main(void);
 
 #endif
