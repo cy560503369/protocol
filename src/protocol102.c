@@ -686,27 +686,6 @@ int make_102_data(Config_102_info* conf, Protocol_data_sm* data_sm)
     return 0;
 }
 
-void showconfig(Config_102_info* conf)
-{
-    int i = 0;
-    printf("port: %s\n", conf->port);
-    printf("device_num: %d\n", conf->device_num);
-    printf("addr: ");
-    for(i = 0; i < conf->device_num; i++)
-    {
-        printf("%d ", conf->device_addr[i]);
-    }
-    printf("\n");
-
-    printf("catch_num: %d\n", conf->catch_num);
-    printf("conf: ");
-    for(i = 0; i < conf->catch_num; i++)
-    {
-        printf("[%d]: %d %d %s\n", i, conf->catch_list[i].record_addr, 
-            conf->catch_list[i].info_addr, conf->catch_list[i].point_name);
-    }
-}
-
 void protocol102_main(void)
 {
     /* 挂接配置文件的共享内存 */
@@ -736,7 +715,6 @@ void protocol102_main(void)
         }
         pthread_rwlock_unlock(&pconfig102_sm->rwlock);
 
-        showconfig(&config102_info);
         int serial_fd = open(config102_info.port, O_RDWR);
         if(serial_fd < 0)
         {

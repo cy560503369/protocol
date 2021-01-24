@@ -76,7 +76,7 @@ int main(void)
 
 	pthread_rwlock_wrlock(&p102_conf->rwlock);
 	p102_conf->update_flag = 1;
-	p102_conf->started = 1;
+	p102_conf->started = 0;
 	strcpy(p102_conf->config_data, a102_test);
 	pthread_rwlock_unlock(&p102_conf->rwlock);
 
