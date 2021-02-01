@@ -16,6 +16,15 @@
 #include <time.h>
 #include "uart.h"
 
+unsigned long get_now_ms_times()
+{
+    struct timespec ts;
+
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+
+    return (ts.tv_sec * 1000 + ts.tv_nsec / 1000000); //ms
+}
+
 int set_serial(int fd, int baud_rate, int databits, int stopbits, int parity)
 {
     struct termios options;
@@ -164,5 +173,32 @@ int serial_send_data(int fd, unsigned char* data_buf, unsigned int len)
 
 int serial_receive_data(int fd, unsigned char* data_buf, unsigned int len)
 {
-    return read(fd, data_buf, len);
+	unsigned int nleft = len;
+	unsigned char *p = data_buf;
+	ssize_t nread = 0;
+	unsigned long lefttime = 3000; // 3s钟 
+
+	while(nleft)
+	{
+		unsigned long now_time = get_now_ms_times();
+		if(lefttime <= 0)
+		{
+			break;
+		}
+		nread = read(fd, p, nleft);
+		if(nread < 0)
+		{
+			return -1;
+		}
+		else if(nread == 0)
+		{
+			break;
+		}
+
+		lefttime = lefttime - (get_now_ms_times() - now_time);
+
+		nleft -= nread;
+		p += nread;
+	}
+    return (len - nleft);
 }
