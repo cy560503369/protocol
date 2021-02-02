@@ -140,7 +140,7 @@ int recv_frame(Slave_node* pslave_node, unsigned char* pframe_buf)
         }
         else
         {
-        	if((get_ms_time() - utime_start) > 3000)  //读3秒没读到数据
+        	if((get_ms_time() - utime_start) > 5000)  //读3秒没读到数据
         	{
         		return -1;
         	}

@@ -7,6 +7,8 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/select.h>
+#include <sys/time.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <termios.h>
@@ -14,6 +16,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <time.h>
+#include <errno.h>
 #include "uart.h"
 
 unsigned long get_now_ms_times()
@@ -161,14 +164,61 @@ int set_serial(int fd, int baud_rate, int databits, int stopbits, int parity)
 
 int serial_send_data(int fd, unsigned char* data_buf, unsigned int len)
 {
-    int ret = 0;
-    ret = write(fd, data_buf, len);
-    if(ret == -1)
+    size_t	nleft;
+	ssize_t nwritten;
+    long timestart = get_now_ms_times();
+	long lefttime = 10000;
+
+    nleft = len;
+
+    while(nleft > 0)
     {
-        perror("serial write");
-        return -1;
+        if(lefttime < 0)
+        {
+            break;
+        }
+
+        if((nwritten = write(fd, data_buf, nleft)) <= 0)
+        {
+            if((nwritten < 0) && (errno == EINTR))
+            {
+                nwritten = 0;
+            }
+            else
+            {
+                return -1;
+            }
+        }
+        nleft -= nwritten;
+        data_buf += nwritten;
+
+        lefttime = 10000 - (get_now_ms_times() - timestart);
     }
-    return 0;
+    
+    return (len - nleft);
+}
+
+int tread(int fd, unsigned char *buf, size_t nbytes, unsigned long ustimeout)
+{
+	int nfds;
+	fd_set	readfds;
+	struct timeval	tv;
+	
+	tv.tv_sec = 0;
+	tv.tv_usec = ustimeout;
+	
+	FD_ZERO(&readfds);
+	FD_SET(fd, &readfds);
+	
+	nfds = select(fd+1, &readfds, NULL, NULL, &tv);
+	
+	if (nfds <= 0) 
+	{
+		  if (nfds == 0)
+			  errno = ETIME;
+		  return(-1);
+	}
+	return(read(fd, buf, nbytes));
 }
 
 int serial_receive_data(int fd, unsigned char* data_buf, unsigned int len)
@@ -176,24 +226,34 @@ int serial_receive_data(int fd, unsigned char* data_buf, unsigned int len)
 	unsigned int nleft = len;
 	unsigned char *p = data_buf;
 	ssize_t nread = 0;
-	unsigned long lefttime = 3000; // 3s钟 
+	unsigned long lefttime = 10000; // 最长读取时间10s钟，如果字符太多，10s接收不完的话可将该值增加
 
 	while(nleft)
 	{
 		unsigned long now_time = get_now_ms_times();
-		if(lefttime <= 0)
+		if(lefttime < 0)
 		{
 			break;
 		}
-		nread = read(fd, p, nleft);
-		if(nread < 0)
-		{
-			return -1;
-		}
-		else if(nread == 0)
-		{
-			break;
-		}
+		if((nread = tread(fd, p, nleft, lefttime)) < 0)
+        {
+            if(errno == EINTR)
+            {
+                nread = 0;
+            }
+            else if (nleft == len)
+            {
+				return(-1); /* error, return -1 */
+            }
+			else
+			{
+				break;	
+			}
+        }
+        else if(nread == 0)
+        {
+            break;
+        }
 
 		lefttime = lefttime - (get_now_ms_times() - now_time);
 
